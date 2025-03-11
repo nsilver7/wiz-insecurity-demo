@@ -7,6 +7,15 @@ module "eks" {
   subnet_ids      = module.vpc.private_subnets
   vpc_id          = module.vpc.vpc_id
 
+  # Enable control plane logging for several log types:
+  cluster_enabled_log_types = [
+    "api",
+    "audit",
+    "authenticator",
+    "controllerManager",
+    "scheduler",
+  ]
+
   eks_managed_node_groups = {
     worker_group = {
       ami_type       = "AL2_x86_64"
