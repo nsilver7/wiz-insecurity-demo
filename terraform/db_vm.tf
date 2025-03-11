@@ -31,7 +31,7 @@ resource "aws_security_group" "db_vm_sg" {
 }
 
 resource "aws_instance" "db_vm" {
-  ami                    = var.db_vm_ami # an outdated Linux AMI ID
+  ami                    = var.db_vm_ami
   instance_type          = "t3.micro"
   subnet_id              = module.vpc.public_subnets[0]
   vpc_security_group_ids = [aws_security_group.db_vm_sg.id]
