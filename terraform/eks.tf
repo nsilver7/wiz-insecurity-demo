@@ -1,14 +1,19 @@
-module "vpc" {
-  source               = "./modules/vpc"
-  vpc_cidr             = var.vpc_cidr
-  public_subnet_cidrs  = var.public_subnet_cidrs
-  private_subnet_cidrs = var.private_subnet_cidrs
-  azs                  = var.azs
-}
-
 module "eks" {
-  source       = "./modules/eks"
-  cluster_name = var.cluster_name
-  vpc_id       = module.vpc.vpc_id
-  subnets      = module.vpc.public_subnets
+  source  = "terraform-aws-modules/eks/aws"
+  version = "20.34.0"
+
+  cluster_name    = var.cluster_name
+  cluster_version = "1.31"
+  subnet_ids      = module.vpc.private_subnets
+  vpc_id          = module.vpc.vpc_id
+
+  eks_managed_node_groups = {
+    worker_group = {
+      ami_type       = "AL2_x86_64"
+      instance_types = ["m6i.large"]
+      min_size       = 1
+      max_size       = 3
+      desired_size   = 2
+    }
+  }
 }
