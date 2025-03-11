@@ -7,6 +7,9 @@ module "eks" {
   subnet_ids      = module.vpc.private_subnets
   vpc_id          = module.vpc.vpc_id
 
+  cluster_endpoint_public_access  = false
+  cluster_endpoint_private_access = true
+
   # Enable control plane logging for several log types:
   cluster_enabled_log_types = [
     "api",

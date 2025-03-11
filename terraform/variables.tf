@@ -33,3 +33,13 @@ variable "azs" {
   type        = list(string)
   default     = ["us-west-2a", "us-west-2b"]
 }
+
+variable "db_vm_ami" {
+  description = "AMI ID for the outdated Linux image to run MongoDB"
+  type        = string
+}
+
+variable "key_name" {
+  description = "EC2 key pair name for SSH access"
+  type        = string
+}
