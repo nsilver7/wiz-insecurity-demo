@@ -31,12 +31,13 @@ resource "aws_security_group" "db_vm_sg" {
 }
 
 resource "aws_instance" "db_vm" {
-  ami                    = var.db_vm_ami
-  instance_type          = "t3.micro"
-  subnet_id              = module.vpc.public_subnets[0]
-  vpc_security_group_ids = [aws_security_group.db_vm_sg.id]
-  key_name               = var.key_name
-  iam_instance_profile   = module.iam.db_vm_instance_profile_name
+  ami                         = var.db_vm_ami
+  instance_type               = "t3.micro"
+  subnet_id                   = module.vpc.public_subnets[0]
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.db_vm_sg.id]
+  key_name                    = var.key_name
+  iam_instance_profile        = module.iam.db_vm_instance_profile_name
 
   tags = {
     Name        = "MongoDB-VM"
