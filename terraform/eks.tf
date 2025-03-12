@@ -41,3 +41,14 @@ module "eks" {
     }
   }
 }
+
+# Let me DB / Bastion VM talk to k8s control plane
+resource "aws_security_group_rule" "eks_allow_db_vm" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = module.eks.cluster_security_group_id
+  source_security_group_id = aws_security_group.db_vm_sg.id
+  description              = "Allow MongoDB VM to communicate with EKS API"
+}

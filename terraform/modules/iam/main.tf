@@ -29,6 +29,16 @@ resource "aws_iam_role_policy_attachment" "db_vm_attach" {
   policy_arn = aws_iam_policy.db_vm_policy.arn
 }
 
+resource "aws_iam_role_policy_attachment" "db_vm_eks_admin" {
+  role       = aws_iam_role.db_vm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "db_vm_eks_worker" {
+  role       = aws_iam_role.db_vm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
 # Create an instance profile for the DB VM so it can assume the above IAM role.
 resource "aws_iam_instance_profile" "db_vm_instance_profile" {
   name = "db-vm-instance-profile"
