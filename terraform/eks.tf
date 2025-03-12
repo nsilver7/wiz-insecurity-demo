@@ -35,9 +35,9 @@ module "eks" {
   # **Grant Bastion VM Role Access to the EKS Cluster**
   access_entries = {
     bastion_vm_role = {
-      principal_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/db_vm_role"
-      type              = "STANDARD"
-      kubernetes_groups = ["system:masters"]
+      principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/db_vm_role"
+      type          = "STANDARD"
+      #kubernetes_groups = ["system:masters"]
     }
   }
 }
