@@ -28,4 +28,16 @@ module "eks" {
       desired_size   = 2
     }
   }
+
+  # Automatically adds the current caller identity as a cluster admin.
+  enable_cluster_creator_admin_permissions = true
+
+  # **Grant Bastion VM Role Access to the EKS Cluster**
+  access_entries = {
+    bastion_vm_role = {
+      principal_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/db_vm_role"
+      type              = "STANDARD"
+      kubernetes_groups = ["system:masters"]
+    }
+  }
 }
