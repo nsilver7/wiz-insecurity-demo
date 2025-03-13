@@ -8,23 +8,7 @@ resource "aws_s3_bucket" "mongo_backup" {
   }
 }
 
-# Apply public-read ACL using the recommended aws_s3_bucket_acl resource
-resource "aws_s3_bucket_acl" "mongo_backup_acl" {
-  bucket = aws_s3_bucket.mongo_backup.id
-  acl    = "public-read"
-}
-
-# Disable public access blocking (required for public policies)
-resource "aws_s3_bucket_public_access_block" "mongo_backup" {
-  bucket = aws_s3_bucket.mongo_backup.id
-
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-# Attach a policy that makes the backups publicly readable
+# Ensure the bucket allows public read access (NO ACLs needed)
 resource "aws_s3_bucket_policy" "mongo_backup_public" {
   bucket = aws_s3_bucket.mongo_backup.id
 
@@ -32,24 +16,49 @@ resource "aws_s3_bucket_policy" "mongo_backup_public" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid       = "AllowPublicRead"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = ["s3:GetObject"]
+        Sid       = "PublicReadGetObject",
+        Effect    = "Allow",
+        Principal = "*",
+        Action    = ["s3:GetObject"],
         Resource  = "arn:aws:s3:::${aws_s3_bucket.mongo_backup.bucket}/*"
       },
       {
-        Sid       = "AllowListBucket"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = ["s3:ListBucket"]
+        Sid       = "PublicListBucket",
+        Effect    = "Allow",
+        Principal = "*",
+        Action    = ["s3:ListBucket"],
         Resource  = "arn:aws:s3:::${aws_s3_bucket.mongo_backup.bucket}"
       }
     ]
   })
 }
 
-# IAM Policy for Backup User (Optional: Attach to EC2 if using AWS CLI for backups)
+# Ensure public access block settings DO NOT block public access
+resource "aws_s3_bucket_public_access_block" "mongo_backup" {
+  bucket                  = aws_s3_bucket.mongo_backup.id
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+# IAM Role for MongoDB Backup (Ensuring it exists)
+resource "aws_iam_role" "mongo_backup_role" {
+  name = "mongo-backup-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect    = "Allow",
+        Principal = { Service = "ec2.amazonaws.com" },
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+# IAM Policy for Backup User (Allows writing to S3)
 resource "aws_iam_policy" "mongo_backup_policy" {
   name        = "MongoDBBackupPolicy"
   description = "Allows EC2 instance to write MongoDB backups to S3"
@@ -66,8 +75,8 @@ resource "aws_iam_policy" "mongo_backup_policy" {
   })
 }
 
-# Attach the IAM policy to an IAM Role (if backing up from an EC2 instance)
+# Attach the IAM policy to the backup role
 resource "aws_iam_role_policy_attachment" "mongo_backup_attachment" {
-  role       = "mongo-backup-role" # Make sure this IAM role exists on your instance
+  role       = aws_iam_role.mongo_backup_role.name
   policy_arn = aws_iam_policy.mongo_backup_policy.arn
 }
