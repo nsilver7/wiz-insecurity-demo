@@ -93,6 +93,9 @@ jobs:
             # Deploy manifests
             kubectl apply -f $BASTION_MANIFEST_PATH
 
+            # Force a rolling restart of the deployment
+            kubectl rollout restart deployment/python-web-app
+
             # Verify pod status
             kubectl get pods -o wide
           "
