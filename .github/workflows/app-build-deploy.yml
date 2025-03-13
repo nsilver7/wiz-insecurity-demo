@@ -1,4 +1,4 @@
-name: Build and Push Docker Image to ECR
+name: Build and Deploy Application
 
 on:
   push:
@@ -14,6 +14,8 @@ env:
   ECR_REPOSITORY: app-container-repo
   CLUSTER_NAME: eks-cluster
   IMAGE_TAG: latest
+  BASTION_IP: 52.11.6.32
+  BASTION_USER: ec2-user
 
 jobs:
   build-and-push:
@@ -21,32 +23,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS Credentials (OIDC)
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        role-to-assume: arn:aws:iam::586794482281:role/github-actions-role
-        role-session-name: github-actions
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::586794482281:role/github-actions-role
+          role-session-name: github-actions
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      run: |
-        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 586794482281.dkr.ecr.$AWS_REGION.amazonaws.com
+      - name: Login to Amazon ECR
+        id: login-ecr
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 586794482281.dkr.ecr.$AWS_REGION.amazonaws.com
 
-    - name: Build Docker Image
-      run: |
-        docker build -t $ECR_REPOSITORY:$IMAGE_TAG -f app/Dockerfile app/
-        docker tag $ECR_REPOSITORY:$IMAGE_TAG 586794482281.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Build Docker Image
+        run: |
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG -f app/Dockerfile app/
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG 586794482281.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: Push Docker Image to Amazon ECR
-      run: |
-        docker push 586794482281.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Push Docker Image to Amazon ECR
+        run: |
+          docker push 586794482281.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
   deploy:
-    name: Deploy to Kubernetes
+    name: Deploy to Kubernetes via Bastion
     runs-on: ubuntu-latest
     needs: build-and-push
 
@@ -58,32 +60,36 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: arn:aws:iam::586794482281:role/github-actions-role
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Update Kubeconfig
-        run: aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
-
-      - name: Debug - Print Working Directory
-        run: pwd
-
-      - name: Debug - List All Files
-        run: ls -R
-
-      - name: Debug - Check if Deployment YAML Exists
+      - name: Configure SSH Key for Bastion
         run: |
-          if [ ! -f k8s-manifests/deployment.yaml ]; then
-            echo "❌ ERROR: k8s-manifests/deployment.yaml does not exist!"
-            exit 1
-          else
-            echo "✅ deployment.yaml exists!"
-          fi
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GH_BASTION_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $BASTION_IP >> ~/.ssh/known_hosts
 
-      - name: Update Image in Kubernetes Deployment YAML
-        run: sed -i "s|.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:.*|.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG|g" k8s-manifests/deployment.yaml
+      - name: Copy Kubernetes Manifests to Bastion
+        run: |
+          scp -r k8s-manifests/ $BASTION_USER@$BASTION_IP:/home/$BASTION_USER/k8s-manifests/
 
-      - name: Apply Kubernetes Manifests
-        run: kubectl apply -f k8s-manifests/
+      - name: Deploy to Kubernetes from Bastion
+        run: |
+          ssh $BASTION_USER@$BASTION_IP << 'EOF'
+            set -e  # Exit on error
+
+            # Configure AWS credentials on bastion
+            export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            export AWS_REGION=${{ env.AWS_REGION }}
+
+            # Verify AWS access
+            aws sts get-caller-identity
+
+            # Configure kubeconfig for EKS
+            aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
+
+            # Deploy manifests
+            kubectl apply -f /home/$BASTION_USER/k8s-manifests/
+
+            # Verify pod status
+            kubectl get pods -o wide
+          EOF
