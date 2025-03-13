@@ -1,17 +1,25 @@
+# Create the S3 bucket for MongoDB backups
 resource "aws_s3_bucket" "mongo_backup" {
-  bucket        = "wizinsecurity-mongo-backups-${var.aws_region}"
-  force_destroy = true
-}
+  bucket = "wizinsecurity-mongo-backups-${var.aws_account_id}"
+  acl    = "public-read"
 
-# Enable bucket versioning (optional, but useful)
-resource "aws_s3_bucket_versioning" "mongo_backup_versioning" {
-  bucket = aws_s3_bucket.mongo_backup.id
-  versioning_configuration {
-    status = "Enabled"
+  tags = {
+    Name        = "MongoDB Backups"
+    Environment = "Production"
   }
 }
 
-# Enable public read access for all objects
+# Disable default AWS public access blocking to allow public access policy
+resource "aws_s3_bucket_public_access_block" "mongo_backup" {
+  bucket = aws_s3_bucket.mongo_backup.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+# Attach a policy that makes the backups publicly readable
 resource "aws_s3_bucket_policy" "mongo_backup_public" {
   bucket = aws_s3_bucket.mongo_backup.id
 
@@ -19,17 +27,42 @@ resource "aws_s3_bucket_policy" "mongo_backup_public" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect    = "Allow",
-        Principal = "*",
-        Action    = ["s3:GetObject"],
-        Resource  = "${aws_s3_bucket.mongo_backup.arn}/*"
+        Sid       = "AllowPublicRead"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = ["s3:GetObject"]
+        Resource  = "arn:aws:s3:::${aws_s3_bucket.mongo_backup.bucket}/*"
       },
       {
-        Effect    = "Allow",
-        Principal = "*",
-        Action    = ["s3:ListBucket"],
-        Resource  = aws_s3_bucket.mongo_backup.arn
+        Sid       = "AllowListBucket"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = ["s3:ListBucket"]
+        Resource  = "arn:aws:s3:::${aws_s3_bucket.mongo_backup.bucket}"
       }
     ]
   })
+}
+
+# IAM Policy for Backup User (Optional: Attach to EC2 if using AWS CLI for backups)
+resource "aws_iam_policy" "mongo_backup_policy" {
+  name        = "MongoDBBackupPolicy"
+  description = "Allows EC2 instance to write MongoDB backups to S3"
+  
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:PutObject"],
+        Resource = "arn:aws:s3:::${aws_s3_bucket.mongo_backup.bucket}/*"
+      }
+    ]
+  })
+}
+
+# Attach the IAM policy to an IAM Role (if backing up from an EC2 instance)
+resource "aws_iam_role_policy_attachment" "mongo_backup_attachment" {
+  role       = "mongo-backup-role"  # Make sure this IAM role exists on your instance
+  policy_arn = aws_iam_policy.mongo_backup_policy.arn
 }
