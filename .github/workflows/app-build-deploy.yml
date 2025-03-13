@@ -67,6 +67,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $BASTION_IP >> ~/.ssh/known_hosts
 
+      - name: Ensure manifest dir exists on Bastion
+        run: |
+          ssh -i ~/.ssh/id_rsa $BASTION_USER@$BASTION_IP "mkdir -p /home/$BASTION_USER/k8s-manifests"
+
       - name: Copy Kubernetes Manifests to Bastion
         run: |
           scp -r k8s-manifests/ $BASTION_USER@$BASTION_IP:/home/$BASTION_USER/k8s-manifests/
