@@ -16,6 +16,7 @@ env:
   IMAGE_TAG: latest
   BASTION_IP: 52.11.6.32
   BASTION_USER: ec2-user
+  BASTION_MANIFEST_PATH: /home/ec2-user/k8s-manifests
 
 jobs:
   build-and-push:
@@ -68,10 +69,10 @@ jobs:
           ssh-keyscan -H $BASTION_IP >> ~/.ssh/known_hosts
 
       - name: Ensure manifest directory exists on Bastion
-        run: ssh -i ~/.ssh/id_rsa $BASTION_USER@$BASTION_IP "mkdir -p /home/$BASTION_USER/k8s-manifests"
+        run: ssh -i ~/.ssh/id_rsa $BASTION_USER@$BASTION_IP "mkdir -p $BASTION_MANIFEST_PATH && rm -rf $BASTION_MANIFEST_PATH/*"
 
       - name: Copy Kubernetes Manifests to Bastion
-        run: scp -r -i ~/.ssh/id_rsa k8s-manifests/ $BASTION_USER@$BASTION_IP:/home/$BASTION_USER/k8s-manifests/
+        run: scp -i ~/.ssh/id_rsa -r k8s-manifests/* $BASTION_USER@$BASTION_IP:$BASTION_MANIFEST_PATH/
 
       - name: Deploy to Kubernetes from Bastion
         run: |
@@ -90,7 +91,7 @@ jobs:
             aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
 
             # Deploy manifests
-            kubectl apply -f /home/$BASTION_USER/k8s-manifests/
+            kubectl apply -f $BASTION_MANIFEST_PATH
 
             # Verify pod status
             kubectl get pods -o wide
