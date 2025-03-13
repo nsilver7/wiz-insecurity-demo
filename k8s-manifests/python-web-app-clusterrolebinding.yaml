@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: python-web-app-admin-binding
+subjects:
+- kind: ServiceAccount
+  name: default  # Change this if using a different ServiceAccount
+  namespace: default  # Change if your app runs in another namespace
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
