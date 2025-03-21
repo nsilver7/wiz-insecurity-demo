@@ -10,10 +10,10 @@ resource "aws_s3_bucket" "mongo_backup" {
 # Enable strict public access blocking
 resource "aws_s3_bucket_public_access_block" "mongo_backup" {
   bucket                  = aws_s3_bucket.mongo_backup.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
 }
 
 # IAM Role to write backups
@@ -27,6 +27,30 @@ resource "aws_iam_role" "mongo_backup_role" {
         Effect    = "Allow",
         Principal = { Service = "ec2.amazonaws.com" },
         Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_policy" "mongo_backup_public" {
+  bucket = aws_s3_bucket.mongo_backup.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject",
+        Effect    = "Allow",
+        Principal = "*",
+        Action    = ["s3:GetObject"],
+        Resource  = "arn:aws:s3:::${aws_s3_bucket.mongo_backup.bucket}/*"
+      },
+      {
+        Sid       = "PublicListBucket",
+        Effect    = "Allow",
+        Principal = "*",
+        Action    = ["s3:ListBucket"],
+        Resource  = "arn:aws:s3:::${aws_s3_bucket.mongo_backup.bucket}"
       }
     ]
   })
