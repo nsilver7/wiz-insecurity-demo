@@ -1,26 +1,51 @@
+locals {
+  # this is gross
+  my_ip = "107.193.220.138/32"
+
+  # Static subset of GitHub Actions IPs (see: https://api.github.com/meta)
+  # curl https://api.github.com/meta | jq '.actions'  
+  github_actions_ips = [
+    "185.199.108.0/22",
+    "140.82.112.0/20",
+  ]
+}
+
 resource "aws_security_group" "db_vm_sg" {
   name        = "db-vm-sg"
   description = "Security group for the MongoDB VM"
   vpc_id      = module.vpc.vpc_id
 
+  # SSH from your IP
   ingress {
-    description = "Allow SSH from anywhere"
+    description = "Allow SSH from my home IP"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [local.my_ip]
   }
 
+  # SSH from GitHub Actions runners
+  dynamic "ingress" {
+    for_each = local.github_actions_ips
+    content {
+      description = "Allow SSH from GitHub Actions"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+    }
+  }
+
+  # MongoDB access from EKS
   ingress {
-    description = "Allow MongoDB access from EKS nodes"
-    from_port   = 27017
-    to_port     = 27017
-    protocol    = "tcp"
-    # This assumes you have an output from your EKS module for the worker nodes’ security group.
-    # For example, if you’ve defined an output "node_security_group_id" in your eks.tf:
+    description     = "Allow MongoDB access from EKS nodes"
+    from_port       = 27017
+    to_port         = 27017
+    protocol        = "tcp"
     security_groups = [module.eks.node_security_group_id]
   }
 
+  # All outbound traffic
   egress {
     description = "Allow all outbound traffic"
     from_port   = 0

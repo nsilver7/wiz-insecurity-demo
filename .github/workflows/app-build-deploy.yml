@@ -58,6 +58,11 @@ jobs:
       contents: read
 
     steps:
+      - name: Show GitHub Actions Runner IP Info
+        run: |
+          echo "Fetching public IP and metadata..."
+          curl -s https://ipinfo.io
+
       - name: Checkout Repository
         uses: actions/checkout@v3
 
