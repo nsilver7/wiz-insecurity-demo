@@ -12,14 +12,22 @@ spec:
       labels:
         app: python-web-app
     spec:
+      securityContext:
+        runAsNonRoot: true
       containers:
-      - name: python-web-app
-        image: 586794482281.dkr.ecr.us-west-2.amazonaws.com/app-container-repo:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: MONGO_CONN
-          valueFrom:
-            secretKeyRef:
-              name: mongo-secret
-              key: MONGO_CONN
+        - name: python-web-app
+          image: 586794482281.dkr.ecr.us-west-2.amazonaws.com/app-container-repo:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MONGO_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_CONN
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
